@@ -1,6 +1,7 @@
 # A workflow to trigger ci on hybrid infra (github + self hosted runner)
 name: Blossom-CI
 on:
+  pull_request:
   issue_comment:
     types: [created]
   workflow_dispatch:
@@ -25,14 +26,14 @@ jobs:
   Authorization:
     name: Authorization
     runs-on: blossom
-    outputs:
-      args: ${{ env.args }}
 
-    # This job only runs for pull request comments
-    if: contains('\
-      Ranjeet-Nvidia,\
-      ', format('{0},', github.actor)) && github.event.comment.body == '/build'
     steps:
+      - name: Test
+        run: mkdir XYZ
+        env: 
+          OPERATION: 'AUTH'
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}                
       - name: Check if comment is issued by authorized person
         run: blossom-ci
         env:
