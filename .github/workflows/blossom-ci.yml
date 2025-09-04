@@ -38,7 +38,7 @@ jobs:
     outputs:
       args: ${{ env.args }}
 
-    # This job only runs for pull request comments
+    # This job only runs for pull request commentss
     if: github.event.comment.body == '/build-ci' || github.event_name == 'pull_request'
     steps:
       - name: Check if comment is issued by authorized person
