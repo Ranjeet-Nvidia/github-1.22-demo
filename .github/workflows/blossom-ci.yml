@@ -1,5 +1,8 @@
 # A workflow to trigger ci on hybrid infra (github + self hosted runner)
 name: Blossom-CI
+run-name: >
+  Blossom CI • Event: ${{ github.event_name }} by @${{ github.actor }}
+  ${{ github.event.inputs.jenkinsJob && format(' • Jenkins Job: {0}', github.event.inputs.jenkinsJob) || '' }}
 on:
   issue_comment:
     types: [created]
