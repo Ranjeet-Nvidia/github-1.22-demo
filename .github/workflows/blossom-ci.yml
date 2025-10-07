@@ -16,6 +16,12 @@ on:
           args:
             description: 'argument'
             required: false
+          jenkinsJob:
+            description: 'Jenkins job name'
+            required: false
+          buildNumber:
+            description: 'Jenkins build number'
+            required: false
 jobs:
   Authorization:
     name: Authorization
