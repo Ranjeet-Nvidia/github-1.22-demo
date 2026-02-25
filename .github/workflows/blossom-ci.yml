@@ -1,5 +1,14 @@
 # A workflow to trigger ci on hybrid infra (github + self hosted runner)
 name: Blossom-CI
+run-name: >
+  ${{ github.event_name == 'workflow_dispatch' &&
+      format(
+        'Blossom CI • Jenkins Job: {0}{1} • PR #{2}',
+        fromJson(github.event.inputs.args).job,
+        fromJson(github.event.inputs.args).build && format(' #{0}', fromJson(github.event.inputs.args).build) || '',
+        fromJson(github.event.inputs.args).pr
+      )
+      || '' }}
 on:
   issue_comment:
     types: [created]
@@ -19,9 +28,7 @@ jobs:
       args: ${{ env.args }}
 
     # This job only runs for pull request comments
-    if: |
-         contains( 'Ranjeet-Nvidia,', format('{0},', github.actor)) && 
-         github.event.comment.body == '/build' 
+    if: github.event.comment.body == '/build'
     steps:
       - name: Check if comment is issued by authorized person
         run: blossom-ci
@@ -36,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v2
         with:
           repository: ${{ fromJson(needs.Authorization.outputs.args).repo }}
           ref: ${{ fromJson(needs.Authorization.outputs.args).ref }}
