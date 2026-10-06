@@ -1,4 +1,4 @@
-# A workflow to trigger ci on hybrid infra (github + self hosted runner)
+﻿# A workflow to trigger ci on hybrid infra (github + self hosted runner)
 name: Blossom-CI
 run-name: >
   ${{ github.event_name == 'workflow_dispatch' &&
@@ -56,6 +56,7 @@ jobs:
   Vulnerability-scan:
     name: Vulnerability scan
     needs: [Authorization]
+    if: ${{ needs.Authorization.outputs.args != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -98,3 +99,4 @@ jobs:
           OPERATION: 'POST-PROCESSING'
           CI_SERVER: ${{ secrets.CI_SERVER }}
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
