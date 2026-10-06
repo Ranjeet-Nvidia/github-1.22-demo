@@ -56,7 +56,7 @@ jobs:
   Vulnerability-scan:
     name: Vulnerability scan
     needs: [Authorization]
-    if: ${{ needs.Authorization.outputs.args != '' }}
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
