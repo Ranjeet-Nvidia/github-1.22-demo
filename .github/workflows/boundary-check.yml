@@ -1,10 +1,71 @@
 name: Blossom runner boundary check
+
 on:
   workflow_dispatch:
+    inputs:
+      file_path:
+        description: "Optional absolute path to a non-sensitive text file"
+        required: false
+        default: "/etc/os-release"
+        type: string
+
+permissions: {}
 
 jobs:
   reachability:
     runs-on: blossom
+    timeout-minutes: 5
+
+    defaults:
+      run:
+        shell: bash
+
     steps:
-      - name: Marker
-        run: echo "BOUNDARY-CHECK"
+      - name: Runner identity and environment
+        run: |
+          echo "BOUNDARY-CHECK"
+          whoami
+          id
+          uname -a
+          printf 'Working directory: '
+          pwd
+          printf 'Workspace: %s\n' "$GITHUB_WORKSPACE"
+          printf 'Temporary directory: %s\n' "$RUNNER_TEMP"
+
+      - name: Check common commands
+        run: |
+          for cmd in bash sh ls cat head find grep git curl python3 node docker kubectl sudo; do
+            if command -v "$cmd" >/dev/null 2>&1; then
+              printf '%s: %s\n' "$cmd" "$(command -v "$cmd")"
+            else
+              printf '%s: unavailable in PATH\n' "$cmd"
+            fi
+          done
+
+      - name: List commands discoverable by Bash
+        run: |
+          compgen -c | sort -u
+
+      - name: List workspace files
+        run: |
+          ls -la -- "$GITHUB_WORKSPACE"
+
+      - name: Test temporary file write and read
+        run: |
+          file="$(mktemp "$RUNNER_TEMP/boundary-check.XXXXXX")"
+          printf 'Runner file access works\n' > "$file"
+          cat -- "$file"
+          rm -- "$file"
+
+      - name: Read selected file
+        env:
+          FILE_PATH: ${{ inputs.file_path }}
+        run: |
+          if [[ -z "$FILE_PATH" ]]; then
+            echo "No file selected."
+          elif [[ -f "$FILE_PATH" && -r "$FILE_PATH" ]]; then
+            printf 'First 100 lines of %s:\n' "$FILE_PATH"
+            head -n 100 -- "$FILE_PATH"
+          else
+            echo "File is missing, not a regular file, or not readable."
+          fi
