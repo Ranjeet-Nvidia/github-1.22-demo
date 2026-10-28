@@ -1,0 +1,10 @@
+name: Blossom runner boundary check
+on:
+  workflow_dispatch:
+
+jobs:
+  reachability:
+    runs-on: blossom
+    steps:
+      - name: Marker
+        run: echo "BOUNDARY-CHECK"
