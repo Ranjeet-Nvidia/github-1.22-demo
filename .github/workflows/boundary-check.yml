@@ -1,28 +1,92 @@
-name: Blossom runner boundary check
+name: Blossom file and network diagnostics
 
 on:
   workflow_dispatch:
+    inputs:
+      file_path:
+        description: "Non-sensitive text file to read"
+        required: true
+        default: "/etc/os-release"
+        type: string
+      endpoint:
+        description: "Authorized HTTPS endpoint to test (no credentials in URL)"
+        required: false
+        type: string
 
 permissions: {}
 
 jobs:
-  reachability:
+  diagnostics:
     runs-on: blossom
     timeout-minutes: 5
-    steps:
-      - name: Check system shell and file access
+    defaults:
+      run:
         shell: /usr/bin/bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: List common directories
         run: |
-          echo "BOUNDARY-CHECK"
-          whoami
-          id
-          pwd
+          for path in / /home/github /tmp /opt /usr/local/bin "$GITHUB_WORKSPACE"; do
+            printf '\n--- %s ---\n' "$path"
+            if [[ -d "$path" && -r "$path" ]]; then
+              ls -la -- "$path" || true
+            else
+              echo "Missing or inaccessible"
+            fi
+          done
 
-          echo "Available commands:"
-          compgen -c | sort -u
+      - name: Read selected file
+        env:
+          FILE_PATH: ${{ inputs.file_path }}
+        run: |
+          if [[ -f "$FILE_PATH" && -r "$FILE_PATH" ]]; then
+            printf 'Showing up to 4096 bytes of: %s\n' "$FILE_PATH"
+            head -c 4096 -- "$FILE_PATH"
+            printf '\n'
+          else
+            echo "Missing, not a regular file, or not readable"
+          fi
 
-          echo "Workspace:"
-          ls -la -- "$GITHUB_WORKSPACE"
+      - name: Test selected HTTPS endpoint
+        env:
+          ENDPOINT: ${{ inputs.endpoint }}
+        run: |
+          if [[ -z "$ENDPOINT" ]]; then
+            echo "No endpoint supplied; skipping"
+            exit 0
+          fi
 
-          echo "OS information:"
-          cat /etc/os-release
+          # Validate the URL and resolve its hostname.
+          python3 - <<'PY'
+          import os
+          import socket
+          from urllib.parse import urlsplit
+
+          url = urlsplit(os.environ["ENDPOINT"])
+          if (url.scheme != "https" or not url.hostname
+                  or url.username is not None or url.password is not None):
+              raise SystemExit("Supply an HTTPS URL without credentials")
+
+          addresses = sorted({
+              result[4][0]
+              for result in socket.getaddrinfo(
+                  url.hostname, url.port or 443,
+                  type=socket.SOCK_STREAM
+              )
+          })
+          print("DNS resolution:", ", ".join(addresses))
+          PY
+
+          # Make one request, discard the body, and retain TLS verification.
+          # Redirects are not followed. No authentication is supplied.
+          set +e
+          curl --disable --silent --show-error \
+            --proto '=https' \
+            --connect-timeout 5 \
+            --max-time 15 \
+            --output /dev/null \
+            --write-out 'HTTP=%{http_code} remote_ip=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' \
+            --url "$ENDPOINT"
+          result=$?
+          printf 'curl exit code=%s\n' "$result"
+          exit "$result"
