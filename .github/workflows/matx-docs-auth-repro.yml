@@ -1,0 +1,41 @@
+name: MatX docs AUTH reproduction (6967441)
+
+on:
+  push:
+    branches:
+      - codex/matx-docs-auth-repro-6967441
+    paths:
+      - .github/workflows/matx-docs-auth-repro.yml
+      - demo-docs/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: matx-docs-repro-6967441
+  cancel-in-progress: false
+
+jobs:
+  Authorization:
+    name: Reproduce PR-only AUTH on a push
+    if: ${{ github.repository == 'Ranjeet-Nvidia/github-1.22-demo' && github.actor == 'Ranjeet-Nvidia' }}
+    runs-on: blossom
+    timeout-minutes: 5
+    steps:
+      - name: Run the same AUTH operation as MatX docs
+        run: blossom-ci
+        env:
+          OPERATION: AUTH
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
+
+  build-docs:
+    name: Docs build must wait for authorization
+    needs: Authorization
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Confirm downstream execution
+        run: printf '%s\n' 'This job must be skipped when AUTH fails.'
+
