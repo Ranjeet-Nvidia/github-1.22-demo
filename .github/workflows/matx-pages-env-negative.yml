@@ -1,0 +1,24 @@
+name: MatX Pages environment negative test (6967441)
+
+on:
+  push:
+    branches:
+      - codex/matx-docs-blocked-6967441
+    paths:
+      - .github/workflows/matx-pages-env-negative.yml
+
+permissions: {}
+
+jobs:
+  excluded-branch:
+    name: Environment must reject the excluded branch
+    if: ${{ github.repository == 'Ranjeet-Nvidia/github-1.22-demo' && github.actor == 'Ranjeet-Nvidia' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - name: Fail if the environment admits the excluded branch
+        run: |
+          echo 'Unexpected environment access from an excluded branch.'
+          exit 1
+
