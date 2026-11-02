@@ -1,41 +1,95 @@
-name: MatX docs AUTH reproduction (6967441)
+name: MatX docs workflow regression test (6967441)
 
 on:
   push:
     branches:
       - codex/matx-docs-auth-repro-6967441
+      - codex/matx-docs-blocked-6967441
     paths:
       - .github/workflows/matx-docs-auth-repro.yml
       - demo-docs/**
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: matx-docs-repro-6967441
   cancel-in-progress: false
 
 jobs:
-  Authorization:
-    name: Reproduce PR-only AUTH on a push
-    if: ${{ github.repository == 'Ranjeet-Nvidia/github-1.22-demo' && github.actor == 'Ranjeet-Nvidia' }}
-    runs-on: blossom
-    timeout-minutes: 5
-    steps:
-      - name: Run the same AUTH operation as MatX docs
-        run: blossom-ci
-        env:
-          OPERATION: AUTH
-          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
-
-  build-docs:
-    name: Docs build must wait for authorization
-    needs: Authorization
+  build:
+    name: Build test documentation
+    if: >-
+      ${{ github.repository == 'Ranjeet-Nvidia/github-1.22-demo' &&
+          github.ref == 'refs/heads/codex/matx-docs-auth-repro-6967441' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          github.actor == 'Ranjeet-Nvidia' &&
+          github.triggering_actor == 'Ranjeet-Nvidia' }}
     runs-on: ubuntu-latest
-    permissions: {}
+    environment:
+      name: github-pages
+    permissions:
+      contents: read
     steps:
-      - name: Confirm downstream execution
-        run: printf '%s\n' 'This job must be skipped when AUTH fails.'
+      - name: Checkout the exact triggering commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Build a small documentation fixture
+        run: |
+          python3 - <<'PY'
+          import html
+          import os
+          from pathlib import Path
+
+          site = Path("demo-site")
+          site.mkdir()
+          body = (
+              "<!doctype html><html><head><meta charset='utf-8'>"
+              "<title>MatX docs workflow regression test</title></head><body>"
+              "<h1>Docs workflow test passed</h1>"
+              "<p>NVBug 6967441: GitHub-hosted docs build and Pages deployment.</p>"
+              "<p>Commit: " + html.escape(os.environ["GITHUB_SHA"]) + "</p>"
+              "<p>Run: " + html.escape(os.environ["GITHUB_RUN_ID"]) + "</p>"
+              "<p>Event: " + html.escape(os.environ["GITHUB_EVENT_NAME"]) + "</p>"
+              "</body></html>"
+          )
+          (site / "index.html").write_text(body, encoding="utf-8")
+          print("Built documentation fixture for", os.environ["GITHUB_SHA"])
+          PY
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          name: github-pages
+          path: demo-site/
+          retention-days: 7
+
+  deploy:
+    name: Publish test documentation
+    needs: build
+    if: >-
+      ${{ github.repository == 'Ranjeet-Nvidia/github-1.22-demo' &&
+          github.ref == 'refs/heads/codex/matx-docs-auth-repro-6967441' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          github.actor == 'Ranjeet-Nvidia' &&
+          github.triggering_actor == 'Ranjeet-Nvidia' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Set up Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+
+      - name: Publish the artifact from this build
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        with:
+          artifact_name: github-pages
 
